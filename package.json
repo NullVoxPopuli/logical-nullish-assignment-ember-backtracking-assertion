@@ -23,6 +23,7 @@
     "test:ember": "ember test"
   },
   "devDependencies": {
+    "@babel/core": "^7.19.1",
     "@ember/optional-features": "^2.0.0",
     "@ember/test-helpers": "^2.8.1",
     "@glimmer/component": "^1.1.2",
@@ -65,5 +66,8 @@
   },
   "ember": {
     "edition": "octane"
+  },
+  "dependencies": {
+    "tracked-built-ins": "^3.1.0"
   }
 }
