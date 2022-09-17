@@ -1,0 +1,6 @@
+{
+  "compilerOptions": {
+    // why does tsc not set to this true by default :)
+    "experimentalDecorators": true
+  }
+}

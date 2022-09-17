@@ -1,136 +1,84 @@
 import Component from '@glimmer/component';
 import { tracked } from '@glimmer/tracking';
-import { TrackedMap } from 'tracked-built-ins';
 import { setComponentTemplate } from '@ember/component';
 import { hbs } from 'ember-cli-htmlbars';
 
+import { TrackedPreferences as One } from './using-tracked-map';
+import { TwoTrackedTwoPreferences as Two } from './using-proxies';
+import { ThreeTrackedAmigos as Three } from './using-deep-tracked';
+
+const TEXT = 'update was clicked';
+
 export default class Demo extends Component {
-  @tracked showWorkingCase = false;
-  @tracked showFailingCase = false;
+  Scenario = Demonstration;
+  preferences = new One();
+  preferences2 = new Two();
+  preferences3 = new Three();
 
-  preferences = new TrackedPreferences();
-
-  preferences2 = new TwoTrackedTwoPreferences();
-
-  toggleWorking = () => (this.showWorkingCase = !this.showWorkingCase);
-  toggleFailing = () => (this.showFailingCase = !this.showFailingCase);
-
-  get working() {
-    return this.preferences2.forPlugin('my-plugin-name')?.theValue;
+  get one() {
+    return this.preferences.forPlugin('my-plugin').theValue;
   }
 
-  updateWorking = () =>
-    this.preferences2.forPlugin('my-plugin-name')?.update('updated');
-
-  get failing() {
-    return this.preferences.forPlugin('my-plugin-name').theValue;
+  get two() {
+    return this.preferences2.forPlugin('my-plugin')?.theValue;
   }
 
-  updateFailing = () =>
-    this.preferences.forPlugin('my-plugin-name')?.update('updated');
+  get three() {
+    return this.preferences3.forPlugin('my-plugin')?.theValue;
+  }
+
+  updateOne = () => this.preferences.forPlugin('my-plugin')?.update(TEXT);
+  updateTwo = () => this.preferences2.forPlugin('my-plugin')?.update(TEXT);
+  updateThree = () => this.preferences3.forPlugin('my-plugin').theValue = TEXT;
 }
 
 setComponentTemplate(
   hbs`
-  Works: <br>
-  <button {{on 'click' this.toggleWorking}}>toggle</button> |
-  <button {{on 'click' this.updateWorking}}>update</button><br>
-  {{#if this.showWorkingCase}}
-    {{this.working}}
-  {{/if}}
+  For each of these scenarios, the succes criteria is:
+  <ul>
+    <li>Click toggle first</li>
+    <li>Observe no error in the console</li>
+    <li>Clicking the 'update' button appropriately updates the text</li>
+    <li>To reset, refresh the page</li>
+    <li>atm, the only working demo is "using proxies"</li>
+  </ul>
 
-  <hr>
+  <this.Scenario @title="Using TrackedMap" @update={{this.updateOne}}>
+    theValue: {{this.one}}
+  </this.Scenario>
 
-  Does not work (causes backtracking assertion): <br>
-  <button {{on 'click' this.toggleFailing}}>toggle</button> |
-  <button {{on 'click' this.updateFailing}}>update</button><br>
-  {{#if this.showFailingCase}}
-    {{this.failing}}
-  {{/if}}
+  <this.Scenario @title="Using proxies" @update={{this.updateTwo}}>
+    theValue: {{this.two}}
+  </this.Scenario>
+
+  <this.Scenario @title="Using deepTracked" @update={{this.updateThree}}>
+    theValue: {{this.three}}
+  </this.Scenario>
 `,
   Demo
 );
 
-let CACHE = new Map();
-class TwoTrackedTwoPreferences {
-  plugins = new TrackedMap();
+class Demonstration extends Component {
+  @tracked visible = false;
 
-  forPlugin = (name) => {
-    let existing = this.plugins.get(name);
-
-    /**
-     * Normally, in a !existing check, we'd set the value on the Map... but,
-     *
-     * We can't call set here during a data _read_, so we need to wait until
-     * data is set, and then we can set.
-     *
-     * We can wait for a set on the plugin prefs because that can only happen outside
-     * a tracking frame -- so we can wait for that to happen, and do our own
-     * setting here, which will update consumers. (hopefully)
-     */
-    if (!existing) {
-      let inCache = CACHE.get(name);
-
-      if (!inCache) {
-        inCache = new TrackedPluginPrefs();
-        CACHE.set(name, inCache);
-      }
-
-      let fnCache = new Map();
-      let self = this; // WHAT YEAR IS IT?!?!?!?
-      return new Proxy(inCache, {
-        get(target, property, receiver) {
-          let value = Reflect.get(target, property, receiver);
-
-          if (typeof value === 'function') {
-            let cachedFn = fnCache.get(property);
-
-            if (cachedFn) {
-              return cachedFn;
-            }
-
-            let newFn = function (...args) {
-              /**
-               * Doing this means that next time `forPlugin` is called, we'll skip all of this
-               * and "just return 'existing'" below
-               */
-              self.plugins.set(name, existing);
-
-              return value(...args);
-            };
-
-            newFn.bind(receiver);
-            fnCache.set(property, newFn);
-
-            return newFn;
-          }
-
-          return value;
-        },
-      });
-    }
-
-    return existing;
-  };
+  toggle = () => (this.visible = !this.visible);
 }
 
-class TrackedPreferences {
-  plugins = new TrackedMap();
+setComponentTemplate(
+  hbs`
+  <fieldset>
+    <legend>
+      {{@title}}
+    </legend>
 
-  forPlugin = (name) => {
-    let existing = this.plugins.get(name);
+    <button {{on 'click' this.toggle}}>toggle</button> |
+    <button {{on 'click' @update}}>update</button><br>
 
-    if (!existing) {
-      existing = new TrackedPluginPrefs();
-      this.plugins.set(name, existing);
-    }
+    {{#if this.visible}}
+      {{yield}}
+    {{/if}}
 
-    return existing;
-  };
-}
-
-class TrackedPluginPrefs {
-  @tracked theValue = 'this is the value in the "preferences"';
-
-  update = (nextValue) => (this.theValue = nextValue);
-}
+  </fieldset>
+`,
+  Demonstration
+);

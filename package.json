@@ -68,6 +68,8 @@
     "edition": "octane"
   },
   "dependencies": {
+    "ember-deep-tracked": "^2.0.0",
+    "ember-tracked-storage-polyfill": "^1.0.0",
     "tracked-built-ins": "^3.1.0"
   }
 }
