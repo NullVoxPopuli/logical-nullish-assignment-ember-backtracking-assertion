@@ -10,11 +10,15 @@ class TrackedPluginPrefs {
 
 let CACHE = new Map();
 export class TwoTrackedTwoPreferences {
+  /**
+   * Now that readStorage and updateStorage are in use,
+   * this no longer needs to be tracked
+   */
   plugins = new TrackedMap();
 
   forPlugin = (name) => {
     let existing = this.plugins.get(name);
-    readStorage(this, name);
+    readStorage(this.plugins, name);
 
     /**
      * Normally, in a !existing check, we'd set the value on the Map... but,
@@ -25,6 +29,8 @@ export class TwoTrackedTwoPreferences {
      * We can wait for a set on the plugin prefs because that can only happen outside
      * a tracking frame -- so we can wait for that to happen, and do our own
      * setting here, which will update consumers. (hopefully)
+     *
+     * None of this code is touched, once we do the plugins.set + updateStorage combo
      */
     if (!existing) {
       let inCache = CACHE.get(name);
@@ -36,6 +42,16 @@ export class TwoTrackedTwoPreferences {
 
       let self = this; // WHAT YEAR IS IT?!?!?!?
       let proxy = new Proxy(inCache, {
+        set(target, property, value, receiver) {
+
+          // what could go wrong? :D
+          inCache[property] = value;
+          self.plugins.set(name, inCache);
+          updateStorage(self.plugins, name);
+          updateStorage(target, property);
+
+          return true;
+        },
         get(target, property, receiver) {
           let value = Reflect.get(target, property, receiver);
 
@@ -50,7 +66,7 @@ export class TwoTrackedTwoPreferences {
                  * and "just return 'existing'" below
                  */
                 self.plugins.set(name, inCache);
-                updateStorage(self, name);
+                updateStorage(self.plugins, name);
 
                 return value.call(target, ...args);
               };
@@ -63,16 +79,14 @@ export class TwoTrackedTwoPreferences {
             return existing;
           }
 
+          readStorage(target, property);
+
           return value;
         },
       });
 
-      console.log(proxy);
-
       return proxy;
     }
-
-    console.log(existing);
 
     return existing;
   };
